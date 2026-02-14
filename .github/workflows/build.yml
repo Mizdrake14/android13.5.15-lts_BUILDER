@@ -107,23 +107,27 @@ jobs:
           TOOLCHAIN="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/zyc-clang"
           wget "$(curl -s https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-main-link.txt)" -O "zyc-clang.tar.gz"
           mkdir -p ${TOOLCHAIN} && tar -xf zyc-clang.tar.gz -C ${TOOLCHAIN}
+
+          # 🔥 FIX: Copy ZyC clang into Android expected directory
+          ANDROID_CLANG_DIR="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/clang-r450784e"
+          rm -rf ${ANDROID_CLANG_DIR}
+          cp -r ${TOOLCHAIN} ${ANDROID_CLANG_DIR}
           
-          # THE FIX: ZyC Clang usually doesn't have a binary named just 'clang'. 
-          # We must create a symlink to whichever versioned clang it contains.
+          # Create required symlinks
           cd ${TOOLCHAIN}/bin
           CLANG_BIN=$(ls clang-[0-9]* | head -n 1)
           if [ ! -z "$CLANG_BIN" ]; then
              ln -sf "$CLANG_BIN" clang
              ln -sf "$CLANG_BIN" clang++
           fi
+          ln -sf ld.lld lld
           cd ${{ env.WORK_DIR }}
           
-          # Add to system path
           echo "${TOOLCHAIN}/bin" >> $GITHUB_PATH
           rm -rf zyc-clang.tar.gz
 
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
-          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
+          # ❌ removed deletion of clang-r450784e (required by build.sh)
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
           
           sed -i \
