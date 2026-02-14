@@ -1,4 +1,4 @@
-name: "Build GKI Kernel"
+name: "Build WildFlower GKI"
 
 env:
   OUT_DIR: "out"
@@ -43,7 +43,7 @@ jobs:
           RUN_NUMBER="${{ github.run_number }}"
           BRANCH="${{ env.KERNEL_BRANCH }}"
           
-          MESSAGE="<b>🚀 Kernel Build Started</b>%0A%0A"
+          MESSAGE="<b>🚀 WildFlower Build Started</b>%0A%0A"
           MESSAGE="${MESSAGE}<b>📦 Variant:</b> ksu%0A"
           MESSAGE="${MESSAGE}<b>📁 Repository:</b> ${{ github.repository }}%0A"
           MESSAGE="${MESSAGE}<b>📍 Branch:</b> ${BRANCH}%0A"
@@ -90,18 +90,20 @@ jobs:
           rm -rf .repo
           rm -rf common
 
-          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
-          mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
-          tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
-          rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
-
+          # ZyC Clang Implementation
+          TOOLCHAIN="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/zyc-clang"
+          wget "$(curl -s https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-main-link.txt)" -O "zyc-clang.tar.gz"
+          mkdir -p ${TOOLCHAIN} && tar -xf zyc-clang.tar.gz -C ${TOOLCHAIN}
+          rm zyc-clang.tar.gz
+          
+          # Remove other clangs to ensure no conflicts
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
           
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=zyc-clang/' \
            ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.constants
           
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
@@ -255,9 +257,8 @@ jobs:
           export TZ="Asia/Jakarta"
           CURRENT_TIME=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
           
-          # Generate random hash-like suffix (looks like stock kernel)
-          RANDOM_HASH=$(openssl rand -hex 6)
-          KERNEL_SUFFIX="-ab${RANDOM_HASH}"
+          # Hardcoded WildFlower Name
+          KERNEL_SUFFIX="-WildFlower"
           
           echo "CURRENT_TIME=$CURRENT_TIME"
           echo "KERNEL_SUFFIX=$KERNEL_SUFFIX"
@@ -271,7 +272,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Wild: Clean Dirty Flag" || true
+          git commit -m "WildFlower: Clean Dirty Flag" || true
 
       - name: "Fix ABI and build configs"
         working-directory: ${{ env.WORK_DIR }}
@@ -339,16 +340,16 @@ jobs:
       - name: "Copy kernel image"
         working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
-          cp Image "Image.ksu"
+          cp Image "Image.WildFlower"
           echo "📦 Kernel image:"
-          ls -lh Image.ksu
+          ls -lh Image.WildFlower
 
       - name: "Upload kernel artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: gki-kernel
+          name: wildflower-kernel
           path: |
-            ${{ env.WORK_DIR }}/out/dist/Image.ksu
+            ${{ env.WORK_DIR }}/out/dist/Image.WildFlower
             ${{ env.WORK_DIR }}/out/dist/kernel_version.txt
           retention-days: 1
 
@@ -362,7 +363,7 @@ jobs:
       - name: "Download kernel artifact"
         uses: actions/download-artifact@v4
         with:
-          name: gki-kernel
+          name: wildflower-kernel
           path: ./artifacts/
 
       - name: "Read kernel version"
@@ -380,43 +381,36 @@ jobs:
         run: |
           set -e
           echo "📦 Creating AnyKernel3 package..."
-         
+          
           git clone --depth=1 https://github.com/superuseryu/AnyKernel3
-         
-          if [ ! -f "./artifacts/Image.ksu" ]; then
-            echo "ERROR: Image.ksu not found in artifacts!"
+          
+          if [ ! -f "./artifacts/Image.WildFlower" ]; then
+            echo "ERROR: Image.WildFlower not found in artifacts!"
             ls -la ./artifacts/
             exit 1
           fi
-         
-          cp ./artifacts/Image.ksu AnyKernel3/
-         
+          
+          cp ./artifacts/Image.WildFlower AnyKernel3/
+          
           DATE_TAG=$(date +'%Y%m%d')
-          ZIP_NAME="Anykernel3_WildKSU_${DATE_TAG}.zip"
-         
+          ZIP_NAME="WildFlower_GKI_${DATE_TAG}.zip"
+          
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
-         
+          
           ZIP_SIZE=$(stat -c%s "$ZIP_NAME")
           ZIP_SIZE_MB=$(echo "scale=2; $ZIP_SIZE / 1024 / 1024" | bc)
           ZIP_SHA256=$(sha256sum "$ZIP_NAME" | cut -d' ' -f1)
           ZIP_SHA256_SHORT=$(echo "$ZIP_SHA256" | cut -c1-16)
-         
+          
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
           echo "ZIP_SIZE_MB=$ZIP_SIZE_MB" >> $GITHUB_ENV
           echo "ZIP_SHA256=$ZIP_SHA256" >> $GITHUB_ENV
           echo "ZIP_SHA256_SHORT=$ZIP_SHA256_SHORT" >> $GITHUB_ENV
           echo "DATE_TAG=$DATE_TAG" >> $GITHUB_ENV
-         
-          echo "✅ Package created: $ZIP_NAME ($ZIP_SIZE_MB MB)"
-          echo "📊 Size: $ZIP_SIZE_MB MB"
-          echo "🔐 SHA256: $ZIP_SHA256"
           
-          # Verify ZIP integrity
-          unzip -t "$ZIP_NAME"
-          file "$ZIP_NAME"
-          ls -la "$ZIP_NAME"
+          echo "✅ Package created: $ZIP_NAME ($ZIP_SIZE_MB MB)"
 
       - name: "Create GitHub Release"
         uses: softprops/action-gh-release@v1
@@ -424,13 +418,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: ${{ env.ZIP_NAME }}
-          tag_name: "Wild_KSU"
+          tag_name: "WildFlower_Build"
 
       - name: "Send Telegram success notification"
         run: |
           TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
           CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/Wild_KSU"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/WildFlower_Build"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           
           BUILD_END_TIME=$(date +%s)
@@ -441,7 +435,7 @@ jobs:
           
           SHORT_SHA=$(echo "${{ env.ZIP_SHA256 }}" | cut -c1-20)
           
-          MESSAGE="<b>🎉 Build Success!</b>%0A%0A"
+          MESSAGE="<b>🎉 WildFlower Success!</b>%0A%0A"
           MESSAGE="${MESSAGE}<b>📦 File:</b> <code>${{ env.ZIP_NAME }}</code>%0A"
           MESSAGE="${MESSAGE}<b>📊 Size:</b> ${{ env.ZIP_SIZE_MB }} MB%0A"
           MESSAGE="${MESSAGE}<b>🔐 SHA256:</b> <code>${SHORT_SHA}...</code>%0A"
@@ -449,13 +443,12 @@ jobs:
           MESSAGE="${MESSAGE}<b>🔗 Release:</b> <a href='${RELEASE_URL}'>click-here</a>%0A"
           MESSAGE="${MESSAGE}<b>📝 Logs:</b> <a href='${RUN_URL}'>View</a>%0A"
           MESSAGE="${MESSAGE}<b>🗓️ Build Time:</b> ${DURATION_MIN}m ${DURATION_SEC}s%0A"
-          MESSAGE="${MESSAGE}<b>📌 Variant:</b> KSU%0A"
-          MESSAGE="${MESSAGE}   - Wild-KSU%0A"
-          MESSAGE="${MESSAGE}   - SUSFS ඞ%0A"
-          MESSAGE="${MESSAGE}   - BBG%0A"
-          MESSAGE="${MESSAGE}   - BBRv1 Westwood TCP%0A%0A"
-          MESSAGE="${MESSAGE}<b>📣 Author/Maintainer:</b> @superuseryu%0A%0A"
-          MESSAGE="${MESSAGE}#kernel #gki #sapphire #sapphiren"
+          MESSAGE="${MESSAGE}<b>📌 Variant:</b> WildFlower GKI%0A"
+          MESSAGE="${MESSAGE}   - SUSFS ඞ%0A"
+          MESSAGE="${MESSAGE}   - BBG%0A"
+          MESSAGE="${MESSAGE}   - BBRv1 Westwood TCP%0A%0A"
+          MESSAGE="${MESSAGE}<b>📣 Maintainer:</b> @superuseryu%0A%0A"
+          MESSAGE="${MESSAGE}#kernel #gki #wildflower"
           
           curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
             -d chat_id="$CHAT_ID" \
@@ -464,14 +457,9 @@ jobs:
             -d disable_web_page_preview=true
           
           if (( $(echo "${{ env.ZIP_SIZE_MB }} < 50" | bc -l) )); then
-            echo "📤 Sending ZIP file to Telegram..."
-            CAPTION=$'📦 ${{ env.ZIP_NAME }} (${{ env.ZIP_SIZE_MB }} MB)\n🔐 SHA256: ${{ env.ZIP_SHA256 }}'
             curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendDocument" \
               -F chat_id="$CHAT_ID" \
-              -F document=@"${{ env.ZIP_NAME }}" \
-              -F caption="$CAPTION"
-          else
-            echo "ℹ️ File size (${{ env.ZIP_SIZE_MB }} MB) too large, sending download link only."
+              -F document=@"${{ env.ZIP_NAME }}"
           fi
 
   notify-failure:
@@ -487,28 +475,9 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           JOB_STATUS="${{ needs.build-kernels.result }}"
           
-          if [ "$JOB_STATUS" = "cancelled" ]; then
-            STATUS_ICON="⚠️"
-            STATUS_TEXT="Workflow Cancelled"
-          elif [ "$JOB_STATUS" = "failure" ]; then
-            STATUS_ICON="❌"
-            STATUS_TEXT="Build Failed"
-          else
-            STATUS_ICON="❓"
-            STATUS_TEXT="Unknown Status ($JOB_STATUS)"
-          fi
-          
-          MESSAGE="<b>${STATUS_ICON} ${STATUS_TEXT}!</b>%0A%0A"
-          MESSAGE="${MESSAGE}<b>📦 Variant:</b> ksu%0A"
+          MESSAGE="<b>❌ WildFlower Build Failed!</b>%0A%0A"
           MESSAGE="${MESSAGE}<b>🕐 Time:</b> $(TZ='Asia/Jakarta' date +'%H:%M:%S WIB')%0A"
           MESSAGE="${MESSAGE}<b>🔗 Logs:</b> <a href='${RUN_URL}'>View Logs</a>%0A"
-          MESSAGE="${MESSAGE}<b>📌 Status:</b> ${JOB_STATUS}%0A"
-          
-          if [ "$JOB_STATUS" = "cancelled" ]; then
-            MESSAGE="${MESSAGE}<b>⚠️ Possible causes:</b> Manual cancel, OOM killer, or infrastructure issue.%0A"
-          fi
-          
-          MESSAGE="${MESSAGE}<b>⚠️ Check the logs for details.</b>"
           
           curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
             -d chat_id="$CHAT_ID" \
