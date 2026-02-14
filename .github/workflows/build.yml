@@ -81,10 +81,10 @@ jobs:
           git clone --recursive --branch ${{ env.KERNEL_BRANCH }} \
             ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }} --depth=1
 
-      - name: Cherry-pick Custom Commits
+      - name: "Cherry-pick Custom Commits"
+        working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          echo "Cherry-picking custom commits into $CONFIG/common..."
-          cd "$CONFIG/common"
+          echo "Cherry-picking custom commits into ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}..." 
           
           # Set gitconfig
           git config --global user.name "mizdrake14"
