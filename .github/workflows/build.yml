@@ -112,22 +112,27 @@ jobs:
           ANDROID_CLANG_DIR="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/clang-r450784e"
           rm -rf ${ANDROID_CLANG_DIR}
           cp -r ${TOOLCHAIN} ${ANDROID_CLANG_DIR}
-          
-          # Create required symlinks
+
+          # Create required symlinks safely
           cd ${TOOLCHAIN}/bin
           CLANG_BIN=$(ls clang-[0-9]* | head -n 1)
-          if [ ! -z "$CLANG_BIN" ]; then
-             ln -sf "$CLANG_BIN" clang
-             ln -sf "$CLANG_BIN" clang++
+          if [ -n "$CLANG_BIN" ]; then
+            ln -sf "$CLANG_BIN" clang
+            ln -sf "$CLANG_BIN" clang++
           fi
-          ln -sf ld.lld lld
+
+          # Only create lld symlink if missing
+          if [ ! -e lld ] && [ -e ld.lld ]; then
+            ln -sf ld.lld lld
+          fi
+
           cd ${{ env.WORK_DIR }}
           
           echo "${TOOLCHAIN}/bin" >> $GITHUB_PATH
           rm -rf zyc-clang.tar.gz
 
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
-          # ❌ removed deletion of clang-r450784e (required by build.sh)
+          # (Removed deletion of clang-r450784e — required by build.sh)
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
           
           sed -i \
