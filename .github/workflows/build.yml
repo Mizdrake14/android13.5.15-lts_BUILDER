@@ -108,10 +108,17 @@ jobs:
           wget "$(curl -s https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-main-link.txt)" -O "zyc-clang.tar.gz"
           mkdir -p ${TOOLCHAIN} && tar -xf zyc-clang.tar.gz -C ${TOOLCHAIN}
           
-          # THE FIX: Ensure a binary named 'clang' exists and is exported to the environment
-          if [ ! -f "${TOOLCHAIN}/bin/clang" ]; then
-            ln -sf $(ls ${TOOLCHAIN}/bin/clang-* | head -n 1) ${TOOLCHAIN}/bin/clang
+          # THE FIX: ZyC Clang usually doesn't have a binary named just 'clang'. 
+          # We must create a symlink to whichever versioned clang it contains.
+          cd ${TOOLCHAIN}/bin
+          CLANG_BIN=$(ls clang-[0-9]* | head -n 1)
+          if [ ! -z "$CLANG_BIN" ]; then
+             ln -sf "$CLANG_BIN" clang
+             ln -sf "$CLANG_BIN" clang++
           fi
+          cd ${{ env.WORK_DIR }}
+          
+          # Add to system path
           echo "${TOOLCHAIN}/bin" >> $GITHUB_PATH
           rm -rf zyc-clang.tar.gz
 
@@ -315,8 +322,9 @@ jobs:
         timeout-minutes: 60
         run: |
           set -e
-          # THE FIX: Explicitly export the ZyC Clang path for the build shell session
-          export PATH="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/zyc-clang/bin:$PATH"
+          # RE-FIX: Explicitly Export Path inside the build run block
+          TOOLCHAIN_BIN="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/zyc-clang/bin"
+          export PATH="${TOOLCHAIN_BIN}:$PATH"
           
           echo "🚀 Starting kernel build with $(nproc) cores..."
           
