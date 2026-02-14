@@ -81,6 +81,21 @@ jobs:
           git clone --recursive --branch ${{ env.KERNEL_BRANCH }} \
             ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }} --depth=1
 
+      - name: Cherry-pick Custom Commits
+        run: |
+          echo "Cherry-picking custom commits into $CONFIG/common..."
+          cd "$CONFIG/common"
+          
+          # Set gitconfig
+          git config --global user.name "mizdrake14"
+          git config --global user.email "mizdrake14@gmail.com"
+
+          # Fetch the specific branch from the remote repository
+          git fetch https://github.com/mizdrake7/WILDFlower-android13-5.15-common-GKI feb1
+
+          # Cherry-pick the specified range of commits
+          git cherry-pick 223757704b54f1b33e9b5b1bb7e99ab12b28e6ff^..8a6dbe7968b316c942596108e92df95e4cab04cb           
+
       - name: "Initialize AOSP repo and toolchains"
         working-directory: ${{ env.WORK_DIR }}
         run: |
@@ -90,13 +105,15 @@ jobs:
           rm -rf .repo
           rm -rf common
 
-          # ZyC Clang Implementation
+          # ZyC Clang Implementation (Replaced aria2 logic)
           TOOLCHAIN="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/zyc-clang"
           wget "$(curl -s https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-main-link.txt)" -O "zyc-clang.tar.gz"
           mkdir -p ${TOOLCHAIN} && tar -xf zyc-clang.tar.gz -C ${TOOLCHAIN}
-          rm zyc-clang.tar.gz
           
-          # Remove other clangs to ensure no conflicts
+          # Fix: Export path so build tools can find clang
+          echo "${TOOLCHAIN}/bin" >> $GITHUB_PATH
+          rm -rf zyc-clang.tar.gz
+
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
           rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
@@ -257,7 +274,7 @@ jobs:
           export TZ="Asia/Jakarta"
           CURRENT_TIME=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
           
-          # Hardcoded WildFlower Name
+          # Changed to WildFlower
           KERNEL_SUFFIX="-WildFlower"
           
           echo "CURRENT_TIME=$CURRENT_TIME"
@@ -411,6 +428,12 @@ jobs:
           echo "DATE_TAG=$DATE_TAG" >> $GITHUB_ENV
           
           echo "✅ Package created: $ZIP_NAME ($ZIP_SIZE_MB MB)"
+          echo "📊 Size: $ZIP_SIZE_MB MB"
+          echo "🔐 SHA256: $ZIP_SHA256"
+          
+          unzip -t "$ZIP_NAME"
+          file "$ZIP_NAME"
+          ls -la "$ZIP_NAME"
 
       - name: "Create GitHub Release"
         uses: softprops/action-gh-release@v1
@@ -443,11 +466,11 @@ jobs:
           MESSAGE="${MESSAGE}<b>🔗 Release:</b> <a href='${RELEASE_URL}'>click-here</a>%0A"
           MESSAGE="${MESSAGE}<b>📝 Logs:</b> <a href='${RUN_URL}'>View</a>%0A"
           MESSAGE="${MESSAGE}<b>🗓️ Build Time:</b> ${DURATION_MIN}m ${DURATION_SEC}s%0A"
-          MESSAGE="${MESSAGE}<b>📌 Variant:</b> WildFlower GKI%0A"
-          MESSAGE="${MESSAGE}   - SUSFS ඞ%0A"
-          MESSAGE="${MESSAGE}   - BBG%0A"
-          MESSAGE="${MESSAGE}   - BBRv1 Westwood TCP%0A%0A"
-          MESSAGE="${MESSAGE}<b>📣 Maintainer:</b> @superuseryu%0A%0A"
+          MESSAGE="${MESSAGE}<b>📌 Variant:</b> WildFlower%0A"
+          MESSAGE="${MESSAGE}   - SUSFS ඞ%0A"
+          MESSAGE="${MESSAGE}   - BBG%0A"
+          MESSAGE="${MESSAGE}   - BBRv1 Westwood TCP%0A%0A"
+          MESSAGE="${MESSAGE}<b>📣 Author/Maintainer:</b> @superuseryu%0A%0A"
           MESSAGE="${MESSAGE}#kernel #gki #wildflower"
           
           curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
@@ -459,7 +482,8 @@ jobs:
           if (( $(echo "${{ env.ZIP_SIZE_MB }} < 50" | bc -l) )); then
             curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendDocument" \
               -F chat_id="$CHAT_ID" \
-              -F document=@"${{ env.ZIP_NAME }}"
+              -F document=@"${{ env.ZIP_NAME }}" \
+              -F caption="$CAPTION"
           fi
 
   notify-failure:
@@ -475,9 +499,22 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           JOB_STATUS="${{ needs.build-kernels.result }}"
           
-          MESSAGE="<b>❌ WildFlower Build Failed!</b>%0A%0A"
+          if [ "$JOB_STATUS" = "cancelled" ]; then
+            STATUS_ICON="⚠️"
+            STATUS_TEXT="Workflow Cancelled"
+          elif [ "$JOB_STATUS" = "failure" ]; then
+            STATUS_ICON="❌"
+            STATUS_TEXT="Build Failed"
+          else
+            STATUS_ICON="❓"
+            STATUS_TEXT="Unknown Status ($JOB_STATUS)"
+          fi
+          
+          MESSAGE="<b>${STATUS_ICON} ${STATUS_TEXT}!</b>%0A%0A"
+          MESSAGE="${MESSAGE}<b>📦 Variant:</b> wildflower%0A"
           MESSAGE="${MESSAGE}<b>🕐 Time:</b> $(TZ='Asia/Jakarta' date +'%H:%M:%S WIB')%0A"
           MESSAGE="${MESSAGE}<b>🔗 Logs:</b> <a href='${RUN_URL}'>View Logs</a>%0A"
+          MESSAGE="${MESSAGE}<b>📌 Status:</b> ${JOB_STATUS}%0A"
           
           curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
             -d chat_id="$CHAT_ID" \
