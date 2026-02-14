@@ -84,17 +84,15 @@ jobs:
       - name: "Cherry-pick Custom Commits"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          echo "Cherry-picking custom commits into ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}..." 
+          echo "Cherry-picking custom commits into ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}..."
           
           # Set gitconfig
           git config --global user.name "mizdrake14"
           git config --global user.email "mizdrake14@gmail.com"
 
-          # Fetch the specific branch from the remote repository
+          # Fetch and cherry-pick
           git fetch https://github.com/mizdrake7/WILDFlower-android13-5.15-common-GKI feb1
-
-          # Cherry-pick the specified range of commits
-          git cherry-pick 223757704b54f1b33e9b5b1bb7e99ab12b28e6ff^..8a6dbe7968b316c942596108e92df95e4cab04cb           
+          git cherry-pick 223757704b54f1b33e9b5b1bb7e99ab12b28e6ff^..8a6dbe7968b316c942596108e92df95e4cab04c
 
       - name: "Initialize AOSP repo and toolchains"
         working-directory: ${{ env.WORK_DIR }}
@@ -105,12 +103,12 @@ jobs:
           rm -rf .repo
           rm -rf common
 
-          # ZyC Clang Implementation (Replaced aria2 logic)
+          # ZyC Clang Implementation
           TOOLCHAIN="${{ env.WORK_DIR }}/prebuilts/clang/host/linux-x86/zyc-clang"
           wget "$(curl -s https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-main-link.txt)" -O "zyc-clang.tar.gz"
           mkdir -p ${TOOLCHAIN} && tar -xf zyc-clang.tar.gz -C ${TOOLCHAIN}
           
-          # Fix: Export path so build tools can find clang
+          # The fix for 'clang: not found'
           echo "${TOOLCHAIN}/bin" >> $GITHUB_PATH
           rm -rf zyc-clang.tar.gz
 
@@ -274,7 +272,6 @@ jobs:
           export TZ="Asia/Jakarta"
           CURRENT_TIME=$(date -u +"%a %b %d %H:%M:%S UTC %Y")
           
-          # Changed to WildFlower
           KERNEL_SUFFIX="-WildFlower"
           
           echo "CURRENT_TIME=$CURRENT_TIME"
@@ -312,7 +309,7 @@ jobs:
       - name: "Build kernel"
         id: build
         working-directory: ${{ env.WORK_DIR }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: |
           set -e
           echo "🚀 Starting kernel build with $(nproc) cores..."
@@ -480,6 +477,7 @@ jobs:
             -d disable_web_page_preview=true
           
           if (( $(echo "${{ env.ZIP_SIZE_MB }} < 50" | bc -l) )); then
+            CAPTION=$'📦 ${{ env.ZIP_NAME }} (${{ env.ZIP_SIZE_MB }} MB)\n🔐 SHA256: ${{ env.ZIP_SHA256 }}'
             curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendDocument" \
               -F chat_id="$CHAT_ID" \
               -F document=@"${{ env.ZIP_NAME }}" \
@@ -511,7 +509,7 @@ jobs:
           fi
           
           MESSAGE="<b>${STATUS_ICON} ${STATUS_TEXT}!</b>%0A%0A"
-          MESSAGE="${MESSAGE}<b>📦 Variant:</b> wildflower%0A"
+          MESSAGE="${MESSAGE}<b>📦 Variant:</b> WildFlower%0A"
           MESSAGE="${MESSAGE}<b>🕐 Time:</b> $(TZ='Asia/Jakarta' date +'%H:%M:%S WIB')%0A"
           MESSAGE="${MESSAGE}<b>🔗 Logs:</b> <a href='${RUN_URL}'>View Logs</a>%0A"
           MESSAGE="${MESSAGE}<b>📌 Status:</b> ${JOB_STATUS}%0A"
